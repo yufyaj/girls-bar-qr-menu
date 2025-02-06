@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createPublicSupabaseClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database'
 
 export type MenuCategory = Database['public']['Tables']['menu_categories']['Row'] & {
@@ -19,7 +19,7 @@ export async function getMenuData(storeId: string) {
       throw new Error('Invalid store ID format')
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createPublicSupabaseClient()
     // カテゴリを取得
     const { data: categories, error: categoryError } = await supabase
       .from('menu_categories')
@@ -37,16 +37,16 @@ export async function getMenuData(storeId: string) {
       .select('*')
       .in(
         'category_id',
-        categories.map((c) => c.id)
+        categories.map((c: MenuCategory) => c.id)
       )
       .eq('is_available', true)
 
     if (itemsError) throw itemsError
 
     // カテゴリごとにメニュー項目をグループ化
-    const menuCategories: MenuCategory[] = categories.map((category) => ({
+    const menuCategories: MenuCategory[] = categories.map((category: Database['public']['Tables']['menu_categories']['Row']) => ({
       ...category,
-      items: items?.filter((item) => item.category_id === category.id) || [],
+      items: items?.filter((item: Database['public']['Tables']['menu_items']['Row']) => item.category_id === category.id) || [],
     }))
 
     return { success: true, data: menuCategories }
@@ -63,7 +63,7 @@ export async function getActiveStaff(storeId: string) {
       throw new Error('Invalid store ID format')
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createPublicSupabaseClient()
     const { data: staff, error } = await supabase
       .from('staff')
       .select('*')
@@ -88,7 +88,7 @@ export async function getTable(tableId: string) {
       throw new Error('Invalid table ID format')
     }
 
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createPublicSupabaseClient()
     const { data: table, error } = await supabase
       .from('tables')
       .select('*, stores(*)')

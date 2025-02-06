@@ -1,16 +1,13 @@
 'use server'
 
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database'
 import { OrderItem } from '@/types/order'
 
-const supabase = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export async function getOrders(storeId: string) {
+
   try {
+    const supabase = await createServerSupabaseClient()
     const { data: orders, error } = await supabase
       .from('orders')
       .select(`
@@ -42,6 +39,7 @@ export async function getOrders(storeId: string) {
 
 export async function updateOrderStatus(orderId: string, status: string) {
   try {
+    const supabase = await createServerSupabaseClient()
     const { error } = await supabase
       .from('orders')
       .update({ status })
@@ -55,68 +53,10 @@ export async function updateOrderStatus(orderId: string, status: string) {
   }
 }
 
-export async function getSalesData(storeId: string, startDate: string, endDate: string) {
-  try {
-    const { data: sales, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        created_at,
-        total_amount,
-        status,
-        order_items (
-          quantity,
-          price_at_time,
-          is_staff_drink,
-          menu_items (
-            name,
-            category_id
-          )
-        )
-      `)
-      .eq('store_id', storeId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
-      .eq('status', 'completed')
-
-    if (error) throw error
-    return { success: true, sales }
-  } catch (error) {
-    console.error('Failed to fetch sales data:', error)
-    return { success: false, error: 'Failed to fetch sales data' }
-  }
-}
-
-export async function getStaffDrinksSummary(storeId: string, startDate: string, endDate: string) {
-  try {
-    const { data: staffDrinks, error } = await supabase
-      .from('staff_drinks')
-      .select(`
-        staff_id,
-        staff (
-          name
-        ),
-        order_items (
-          menu_items (
-            name
-          ),
-          price_at_time
-        )
-      `)
-      .gte('drink_date', startDate)
-      .lte('drink_date', endDate)
-      .order('drink_date', { ascending: false })
-
-    if (error) throw error
-    return { success: true, staffDrinks }
-  } catch (error) {
-    console.error('Failed to fetch staff drinks summary:', error)
-    return { success: false, error: 'Failed to fetch staff drinks summary' }
-  }
-}
-
 export async function createOrder(tableId: string, items: OrderItem[]) {
   try {
+    const supabase = await createServerSupabaseClient()
+    
     // テーブル情報からstore_idを取得
     const { data: table, error: tableError } = await supabase
       .from('tables')
@@ -168,31 +108,37 @@ export async function createOrder(tableId: string, items: OrderItem[]) {
       menu_item_id: item.menuItemId,
       quantity: item.quantity,
       price_at_time: priceMap.get(item.menuItemId) || 0,
-      is_staff_drink: item.isStaffDrink,
       staff_id: item.staffId,
+      is_staff_drink: item.isStaffDrink
     }))
 
-    const { error: itemsError } = await supabase
+    const { data: insertedItems, error: itemsError } = await supabase
       .from('order_items')
       .insert(orderItems)
+      .select()
 
     if (itemsError) throw itemsError
+    if (!insertedItems) throw new Error('Failed to insert order items')
 
-    // 店員ドリンクの記録
-    const staffDrinks = items
-      .filter((item) => item.isStaffDrink && item.staffId)
-      .map((item) => ({
-        staff_id: item.staffId!,
-        order_item_id: order.id,
-        drink_date: new Date().toISOString().split('T')[0],
-      }))
+    // staff_drinksテーブルにデータを登録
+    const staffDrinkItems = items.filter(item => item.isStaffDrink && item.staffId)
+    if (staffDrinkItems.length > 0) {
+      const staffDrinks = staffDrinkItems.map(item => {
+        const orderItem = insertedItems.find(oi => oi.menu_item_id === item.menuItemId)
+        if (!orderItem) throw new Error('Order item not found')
+        
+        return {
+          staff_id: item.staffId,
+          order_item_id: orderItem.id,
+          drink_date: new Date().toISOString().split('T')[0]
+        }
+      })
 
-    if (staffDrinks.length > 0) {
-      const { error: staffDrinksError } = await supabase
+      const { error: staffDrinkError } = await supabase
         .from('staff_drinks')
         .insert(staffDrinks)
 
-      if (staffDrinksError) throw staffDrinksError
+      if (staffDrinkError) throw staffDrinkError
     }
 
     return { success: true, orderId: order.id }

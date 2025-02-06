@@ -87,6 +87,16 @@ CREATE TABLE order_items (
     CHECK (quantity > 0)
 );
 
+-- Create store_users table
+CREATE TABLE store_users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    UNIQUE(store_id, user_id)
+);
+
 -- Create staff_drinks table (集計用)
 CREATE TABLE staff_drinks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -139,5 +149,10 @@ CREATE TRIGGER update_orders_updated_at
 
 CREATE TRIGGER update_order_items_updated_at
     BEFORE UPDATE ON order_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_store_users_updated_at
+    BEFORE UPDATE ON store_users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

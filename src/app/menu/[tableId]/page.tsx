@@ -10,7 +10,9 @@ interface MenuPageProps {
 }
 
 export default async function MenuPage({ params }: MenuPageProps) {
-  const { success, data: table, error } = await getTable(params.tableId)
+  // Next.js 14では、paramsを使用する前にawaitする必要があります
+  const { tableId } = await params
+  const { success, data: table, error } = await getTable(tableId)
 
   if (!success || !table) {
     return (

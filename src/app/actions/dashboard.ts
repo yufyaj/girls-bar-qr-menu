@@ -1,145 +1,148 @@
 'use server'
 
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { Database } from '@/types/database'
-
-const supabase = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-interface OrderWithTables {
-  id: string
-  created_at: string
-  status: string
-  total_amount: number
-  tables: {
-    name: string
-  }
-}
-
-interface StaffDrinkWithStaff {
-  staff: {
-    name: string
-  }
-  count: string
-}
 
 export interface DashboardSummary {
   totalSales: number
   orderCount: number
   drinkCount: number
   customerCount: number
-  recentOrders: Array<{
+  recentOrders: any[]
+}
+
+type DatabaseOrder = {
+  id: string
+  created_at: string
+  total_amount: number
+  status: string
+  table_id: string
+  tables: {
+    table_number: string
+  }
+  order_items: {
     id: string
-    created_at: string
-    status: string
-    total_amount: number
-    tables: { name: string }
-  }>
-  staffDrinks: Array<{
-    staff: { name: string }
-    drinkCount: number
-  }>
+    quantity: number
+    menu_items: {
+      id: string
+      category_id: number
+    }
+  }[]
 }
 
 export async function getDashboardSummary(storeId: string): Promise<DashboardSummary> {
+  // JSTの今日の0時を取得
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString()
+  // UTCに変換（JST 0:00 = UTC 15:00 前日）
+  const todayUTC = new Date(today.getTime() - (today.getTimezoneOffset() * 60000))
 
-  // 本日の売上を取得
-  const { data: salesData } = await supabase
-    .from('orders')
-    .select('total_amount')
-    .eq('store_id', storeId)
-    .gte('created_at', todayStr)
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: rawOrders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        created_at,
+        total_amount,
+        status,
+        table_id,
+        tables (
+          table_number
+        ),
+        order_items (
+          id,
+          quantity,
+          menu_items (
+            id,
+            category_id
+          )
+        )
+      `)
+      .eq('store_id', storeId)
+      .eq('status', 'completed')
+      .gte('created_at', todayUTC.toISOString())
+      .order('created_at', { ascending: false })
 
-  const totalSales = salesData?.reduce((sum: number, order: { total_amount: number }) => 
-    sum + (order.total_amount || 0), 0) || 0
+    if (error) throw error
 
-  // 本日の注文数を取得
-  const { count: orderCount } = await supabase
-    .from('orders')
-    .select('*', { count: 'exact', head: true })
-    .eq('store_id', storeId)
-    .gte('created_at', todayStr)
+    // データを安全に変換
+    const orders = (rawOrders as unknown as DatabaseOrder[]) || []
+    console.log('Fetched orders:', JSON.stringify(orders, null, 2))
 
-  // 本日のドリンク数を取得
-  const { data: drinkData } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      order_items (
-        quantity
-      )
-    `)
-    .eq('store_id', storeId)
-    .gte('created_at', todayStr)
+    const summary: DashboardSummary = {
+      totalSales: 0,
+      orderCount: 0,
+      drinkCount: 0,
+      customerCount: 0,
+      recentOrders: orders.slice(0, 5),
+    }
 
-  const drinkCount = drinkData?.reduce((sum: number, order: { order_items: { quantity: number }[] }) => {
-    return sum + order.order_items.reduce((itemSum: number, item: { quantity: number }) => 
-      itemSum + (item.quantity || 0), 0)
-  }, 0) || 0
+    if (orders.length > 0) {
+      summary.orderCount = orders.length
+      console.log('Order count:', summary.orderCount)
 
-  // 本日の来店数を取得（テーブルごとにユニークにカウント）
-  const { count: customerCount } = await supabase
-    .from('orders')
-    .select('table_id', { count: 'exact', head: true })
-    .eq('store_id', storeId)
-    .gte('created_at', todayStr)
+      summary.totalSales = orders.reduce((sum: number, order) => {
+        const amount = order.total_amount || 0
+        console.log('Order amount:', amount, 'for order:', order.id)
+        return sum + amount
+      }, 0)
+      console.log('Total sales:', summary.totalSales)
 
-  // 最新の注文を取得
-  const { data: recentOrders } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      created_at,
-      status,
-      total_amount,
-      tables (
-        name
-      )
-    `)
-    .eq('store_id', storeId)
-    .order('created_at', { ascending: false })
-    .limit(5) as { data: OrderWithTables[] | null }
+      summary.drinkCount = orders.reduce((sum: number, order) => {
+        const orderDrinks = order.order_items.reduce((itemSum: number, item) => {
+          const isDrink = item.menu_items.category_id === 2 // 2はドリンクカテゴリーのID
+          const quantity = isDrink ? item.quantity : 0
+          console.log('Item:', item, 'isDrink:', isDrink, 'quantity:', quantity)
+          return itemSum + quantity
+        }, 0)
+        console.log('Order drinks:', orderDrinks, 'for order:', order.id)
+        return sum + orderDrinks
+      }, 0)
+      console.log('Total drinks:', summary.drinkCount)
 
-  // 本日の店員ドリンク状況を取得
-  const { data: rawStaffDrinks } = await supabase
-    .from('staff_drinks')
-    .select(`
-      staff (
-        name
-      ),
-      count:order_item_id
-    `)
-    .eq('store_id', storeId)
-    .eq('drink_date', today.toISOString().split('T')[0]) as { data: StaffDrinkWithStaff[] | null }
+      const uniqueTables = new Set(orders.map(order => order.table_id))
+      console.log('Unique tables:', Array.from(uniqueTables))
+      summary.customerCount = uniqueTables.size
+    }
 
-  const staffDrinkCounts = new Map<string, number>()
-  rawStaffDrinks?.forEach(drink => {
-    const staffName = drink.staff.name
-    staffDrinkCounts.set(staffName, (staffDrinkCounts.get(staffName) || 0) + 1)
-  })
+    return summary
+  } catch (error) {
+    console.error('Failed to fetch dashboard summary:', error)
+    return {
+      totalSales: 0,
+      orderCount: 0,
+      drinkCount: 0,
+      customerCount: 0,
+      recentOrders: [],
+    }
+  }
+}
 
-  const staffDrinks = Array.from(staffDrinkCounts.entries()).map(([name, count]) => ({
-    staff: { name },
-    drinkCount: count
-  }))
+export async function getSalesData(storeId: string, startDate: string, endDate: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          *,
+          menu_items (
+            name
+          )
+        )
+      `)
+      .eq('store_id', storeId)
+      .eq('status', 'completed')
+      .gte('created_at', `${startDate}T00:00:00`)
+      .lte('created_at', `${endDate}T23:59:59`)
+      .order('created_at', { ascending: false })
 
-  return {
-    totalSales,
-    orderCount: orderCount || 0,
-    drinkCount,
-    customerCount: customerCount || 0,
-    recentOrders: recentOrders?.map(order => ({
-      id: order.id,
-      created_at: order.created_at,
-      status: order.status,
-      total_amount: order.total_amount,
-      tables: { name: order.tables.name }
-    })) || [],
-    staffDrinks
+    if (error) throw error
+    return { success: true, orders }
+  } catch (error) {
+    console.error('Failed to fetch sales data:', error)
+    return { success: false, error: 'Failed to fetch sales data' }
   }
 }

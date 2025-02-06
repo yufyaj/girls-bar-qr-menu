@@ -14,12 +14,15 @@ import { Database } from '@/types/database'
 
 type Staff = Database['public']['Tables']['staff']['Row']
 
-interface CartItem extends Omit<OrderItem, 'menuItemId'> {
+type CartItem = {
   menuItem: {
     id: string
     name: string
     price: number
   }
+  quantity: number
+  isStaffDrink: boolean
+  staffId?: string
   staffName?: string
 }
 
@@ -86,18 +89,17 @@ export function MenuClient({ tableId, storeId }: MenuClientProps) {
 
     if (!menuItem) return
 
-    setCartItems(prev => [
-      ...prev,
-      {
-        menuItem: {
-          id: menuItem.id,
-          name: menuItem.name,
-          price: menuItem.price,
-        },
-        quantity: quantities[itemId],
-        isStaffDrink: false,
-      }
-    ])
+    const newItem: CartItem = {
+      menuItem: {
+        id: menuItem.id,
+        name: menuItem.name,
+        price: menuItem.price,
+      },
+      quantity: quantities[itemId],
+      isStaffDrink: false,
+    }
+
+    setCartItems(prev => [...prev, newItem])
 
     showToast({
       type: 'success',
@@ -123,20 +125,19 @@ export function MenuClient({ tableId, storeId }: MenuClientProps) {
     const selectedStaff = staff.find(s => s.id === staffId)
     if (!selectedStaff) return
 
-    setCartItems(prev => [
-      ...prev,
-      {
-        menuItem: {
-          id: menuItem.id,
-          name: menuItem.name,
-          price: menuItem.price,
-        },
-        quantity: quantities[selectedItemId],
-        isStaffDrink: true,
-        staffId,
-        staffName: selectedStaff.name,
-      }
-    ])
+    const newItem: CartItem = {
+      menuItem: {
+        id: menuItem.id,
+        name: menuItem.name,
+        price: menuItem.price,
+      },
+      quantity: quantities[selectedItemId],
+      isStaffDrink: true,
+      staffId,
+      staffName: selectedStaff.name,
+    }
+
+    setCartItems(prev => [...prev, newItem])
 
     setSelectedItemId(null)
     setIsStaffModalOpen(false)
@@ -153,6 +154,8 @@ export function MenuClient({ tableId, storeId }: MenuClientProps) {
     try {
       const items: OrderItem[] = cartItems.map(item => ({
         menuItemId: item.menuItem.id,
+        name: item.menuItem.name,
+        price: item.menuItem.price,
         quantity: item.quantity,
         isStaffDrink: item.isStaffDrink,
         staffId: item.staffId,

@@ -18,8 +18,13 @@ import { Database } from '@/types/database'
 
 type MenuItem = Database['public']['Tables']['menu_items']['Row']
 
-export function MenuManager({ storeId }: { storeId: string }) {
-  const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([])
+type MenuManagerProps = {
+  storeId: string;
+  initialCategories: MenuCategory[];
+}
+
+export function MenuManager({ storeId, initialCategories }: MenuManagerProps) {
+  const [menuCategories, setMenuCategories] = useState<MenuCategory[]>(initialCategories)
   const [toastShow, setToastShow] = useState(false)
   const [toastProps, setToastProps] = useState<{
     type: 'success' | 'error'

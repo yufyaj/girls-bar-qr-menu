@@ -1,9 +1,8 @@
 import { getAllStaff } from '@/app/actions/staff'
 import { StaffManager } from '@/components/admin/staff/StaffManager'
-import { checkAuth, getCurrentStoreId } from '@/app/actions/auth'
+import { getCurrentStoreId } from '@/app/actions/auth'
 
 export default async function StaffPage() {
-  await checkAuth()
   const storeId = await getCurrentStoreId()
   const result = await getAllStaff(storeId)
   const staff = result.success && result.data ? result.data : []

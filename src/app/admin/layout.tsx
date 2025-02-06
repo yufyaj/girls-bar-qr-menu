@@ -1,5 +1,6 @@
-import { checkAuth } from "@/app/actions/auth";
+import { getAuthData } from "@/app/actions/auth";
 import AdminHeader from "@/components/admin/AdminHeader";
+import { redirect } from "next/navigation";
 
 export default async function AdminLayout({
   children,
@@ -8,7 +9,10 @@ export default async function AdminLayout({
 }) {
   // ログインページ以外では認証チェックを行う
   if (!process.env.NODE_ENV?.startsWith('development')) {
-    await checkAuth();
+    const authData = await getAuthData();
+    if (!authData) {
+      redirect('/admin/login');
+    }
   }
 
   return (

@@ -12,7 +12,6 @@ export function DashboardClient({ storeId }: { storeId: string }) {
     drinkCount: 0,
     customerCount: 0,
     recentOrders: [],
-    staffDrinks: []
   })
 
   const fetchSummary = async () => {
@@ -72,53 +71,32 @@ export function DashboardClient({ storeId }: { storeId: string }) {
         </CardContainer>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 最新の注文 */}
-        <CardContainer>
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">最新の注文</h3>
-            <div className="mt-4 space-y-4">
-              {summary.recentOrders.length > 0 ? (
-                summary.recentOrders.map(order => (
-                  <div key={order.id} className="flex justify-between items-center text-sm">
-                    <div>
-                      <p className="font-medium">{order.tables.name}</p>
-                      <p className="text-gray-500">
-                        {new Date(order.created_at).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">¥{order.total_amount.toLocaleString()}</p>
-                      <p className="text-gray-500">{order.status}</p>
-                    </div>
+      {/* 最新の注文 */}
+      <CardContainer>
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium leading-6 text-gray-900">最新の注文</h3>
+          <div className="mt-4 space-y-4">
+            {summary.recentOrders.length > 0 ? (
+              summary.recentOrders.map(order => (
+                <div key={order.id} className="flex justify-between items-center text-sm">
+                  <div>
+                    <p className="font-medium">{order.tables.table_number}</p>
+                    <p className="text-gray-500">
+                      {new Date(order.created_at).toLocaleTimeString()}
+                    </p>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">注文はありません</p>
-              )}
-            </div>
-          </div>
-        </CardContainer>
-
-        {/* 本日の店員ドリンク状況 */}
-        <CardContainer>
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">本日の店員ドリンク状況</h3>
-            <div className="mt-4 space-y-4">
-              {summary.staffDrinks.length > 0 ? (
-                summary.staffDrinks.map((drink, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm">
-                    <p className="font-medium">{drink.staff.name}</p>
-                    <p className="text-gray-500">{drink.drinkCount}杯</p>
+                  <div className="text-right">
+                    <p className="font-medium">¥{order.total_amount.toLocaleString()}</p>
+                    <p className="text-gray-500">{order.status}</p>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">データはありません</p>
-              )}
-            </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">注文はありません</p>
+            )}
           </div>
-        </CardContainer>
-      </div>
+        </div>
+      </CardContainer>
 
       {/* 注文管理 */}
       <div className="space-y-4">

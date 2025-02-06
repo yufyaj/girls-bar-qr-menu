@@ -5,6 +5,22 @@ import { cookies } from 'next/headers'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// 管理者用のサービスロールクライアント作成
+export async function createServiceRoleClient() {
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseServiceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
+  }
+
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  });
+}
+
 // 通常の認証済みクライアント作成
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
@@ -15,8 +31,11 @@ export async function createServerSupabaseClient() {
     throw new Error('認証が必要です。再度ログインしてください。')
   }
 
+  // base64-プレフィックスを削除
+  const cleanAccessToken = accessToken.replace(/^base64-/, '')
+
   const headers: { [key: string]: string } = {
-    Authorization: `Bearer ${accessToken}`
+    Authorization: `Bearer ${cleanAccessToken}`
   }
 
   try {
@@ -24,7 +43,22 @@ export async function createServerSupabaseClient() {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
-        detectSessionInUrl: false
+        detectSessionInUrl: false,
+        storage: {
+          getItem: async (key: string) => {
+            const store = await cookies()
+            const value = store.get(key)?.value
+            return value ?? null
+          },
+          setItem: async (key: string, value: string) => {
+            // セッション更新はupdateSession関数で処理されるため、
+            // ここでは何もしない
+          },
+          removeItem: async (key: string) => {
+            // セッション削除はclearAuthCookies関数で処理されるため、
+            // ここでは何もしない
+          }
+        }
       },
       global: {
         headers,
@@ -33,7 +67,11 @@ export async function createServerSupabaseClient() {
     })
 
     // トークンの有効期限をチェック
-    const decoded = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString())
+    const token = cleanAccessToken.split('.')
+    if (token.length !== 3) {
+      throw new Error('Invalid token format')
+    }
+    const decoded = JSON.parse(Buffer.from(token[1], 'base64url').toString())
     const expirationTime = decoded.exp * 1000 // Convert to milliseconds
     const currentTime = Date.now()
 
@@ -62,6 +100,17 @@ export async function createServerSupabaseClient() {
 
 // 認証チェックをスキップするクライアント作成（ログアウト用）
 export async function createUnauthenticatedClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  })
+}
+
+// メニュー閲覧用の非認証クライアント作成
+export async function createPublicSupabaseClient() {
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: false,

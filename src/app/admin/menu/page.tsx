@@ -1,9 +1,8 @@
 import { getMenuData } from '@/app/actions/menu'
 import { MenuManager } from '@/components/admin/menu/MenuManager'
-import { checkAuth, getCurrentStoreId } from '@/app/actions/auth'
+import { getCurrentStoreId } from '@/app/actions/auth'
 
 export default async function MenuPage() {
-  await checkAuth()
   const storeId = await getCurrentStoreId()
   const result = await getMenuData(storeId)
   const categories = result.success && result.data ? result.data : []
