@@ -31,7 +31,7 @@ export async function getMenuData(storeId: string) {
 
     if (!categories) return { success: false, error: 'Categories not found' }
 
-    // メニュー項目を取得
+    // メニュー項目を取得（deleted_at IS NULLの条件を追加）
     const { data: items, error: itemsError } = await supabase
       .from('menu_items')
       .select('*')
@@ -40,6 +40,7 @@ export async function getMenuData(storeId: string) {
         categories.map((c: MenuCategory) => c.id)
       )
       .eq('is_available', true)
+      .is('deleted_at', null)
 
     if (itemsError) throw itemsError
 
@@ -254,14 +255,17 @@ export async function deleteMenuItem(id: string) {
     }
 
     const supabase = await createServerSupabaseClient()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('menu_items')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
+      .is('deleted_at', null)
+      .select()
+      .single()
 
     if (error) throw error
 
-    return { success: true }
+    return { success: true, data }
   } catch (error) {
     console.error('Failed to delete menu item:', error)
     const message = error instanceof Error ? error.message : 'Failed to delete menu item'

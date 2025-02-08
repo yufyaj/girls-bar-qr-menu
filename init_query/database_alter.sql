@@ -53,3 +53,15 @@ USING (true);
 ALTER TABLE stores
 ADD COLUMN opening_time TIME,
 ADD COLUMN closing_time TIME;
+
+-- Add deleted_at column to menu_items table for soft delete
+ALTER TABLE menu_items
+ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+
+-- Add deleted_at column to staff table for soft delete
+ALTER TABLE staff
+ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+
+-- Remove staff_code column from staff table
+ALTER TABLE staff
+DROP COLUMN staff_code;

@@ -13,21 +13,18 @@ interface StaffManagerProps {
 export function StaffManager({ initialStaff, storeId }: StaffManagerProps) {
   const [staffList, setStaffList] = useState(initialStaff)
   const [isAddingStaff, setIsAddingStaff] = useState(false)
-  const [newStaffData, setNewStaffData] = useState({
-    name: '',
-    staffCode: '',
-  })
+  const [newStaffName, setNewStaffName] = useState('')
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
 
   const resetForm = () => {
-    setNewStaffData({ name: '', staffCode: '' })
+    setNewStaffName('')
     setIsAddingStaff(false)
   }
 
   const handleAddStaff = async () => {
-    if (!newStaffData.name) return
+    if (!newStaffName) return
 
-    const result = await createStaff(storeId, newStaffData.name, newStaffData.staffCode)
+    const result = await createStaff(storeId, newStaffName)
     if (result.success && result.data) {
       setStaffList([...staffList, result.data])
       resetForm()
@@ -49,8 +46,9 @@ export function StaffManager({ initialStaff, storeId }: StaffManagerProps) {
     if (!confirm('このスタッフを削除してもよろしいですか？')) return
 
     const result = await deleteStaff(staffId)
-    if (result.success && result.data) {
-      setStaffList(staffList.map((s) => (s.id === staffId ? result.data : s)))
+    if (result.success) {
+      // 削除されたスタッフをリストから除外
+      setStaffList(staffList.filter((s) => s.id !== staffId))
     }
   }
 
@@ -79,16 +77,9 @@ export function StaffManager({ initialStaff, storeId }: StaffManagerProps) {
             <div className="mb-4 space-y-4">
               <input
                 type="text"
-                value={newStaffData.name}
-                onChange={(e) => setNewStaffData({ ...newStaffData, name: e.target.value })}
+                value={newStaffName}
+                onChange={(e) => setNewStaffName(e.target.value)}
                 placeholder="名前"
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-              />
-              <input
-                type="text"
-                value={newStaffData.staffCode}
-                onChange={(e) => setNewStaffData({ ...newStaffData, staffCode: e.target.value })}
-                placeholder="スタッフコード（オプション）"
                 className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
               />
               <div className="flex gap-2">
@@ -113,9 +104,6 @@ export function StaffManager({ initialStaff, storeId }: StaffManagerProps) {
               <div key={staff.id} className="flex items-center justify-between py-3">
                 <div>
                   <div className="font-medium">{staff.name}</div>
-                  {staff.staff_code && (
-                    <div className="text-sm text-gray-500">コード: {staff.staff_code}</div>
-                  )}
                 </div>
                 <div className="flex items-center gap-4">
                   <button

@@ -11,7 +11,7 @@ function isValidUUID(id: string) {
   return uuidPattern.test(id)
 }
 
-// スタッフ一覧を取得（非アクティブも含む）
+// スタッフ一覧を取得（削除済みを除く）
 export async function getAllStaff(storeId: string) {
   try {
     if (!isValidUUID(storeId)) {
@@ -23,6 +23,7 @@ export async function getAllStaff(storeId: string) {
       .from('staff')
       .select('*')
       .eq('store_id', storeId)
+      .is('deleted_at', null)
       .order('name')
 
     if (error) throw error
@@ -48,6 +49,7 @@ export async function getActiveStaff(storeId: string) {
       .select('*')
       .eq('store_id', storeId)
       .eq('is_active', true)
+      .is('deleted_at', null)
       .order('name')
 
     if (error) throw error
@@ -61,7 +63,7 @@ export async function getActiveStaff(storeId: string) {
 }
 
 // スタッフを作成
-export async function createStaff(storeId: string, name: string, staffCode?: string) {
+export async function createStaff(storeId: string, name: string) {
   try {
     if (!isValidUUID(storeId)) {
       throw new Error('Invalid store ID format')
@@ -74,7 +76,6 @@ export async function createStaff(storeId: string, name: string, staffCode?: str
         {
           store_id: storeId,
           name,
-          staff_code: staffCode,
           is_active: true,
         },
       ])
@@ -106,10 +107,23 @@ export async function updateStaff(
     }
 
     const supabase = await createServerSupabaseClient()
+
+    // 削除済みのスタッフは更新できない
+    const { data: existingStaff } = await supabase
+      .from('staff')
+      .select('deleted_at')
+      .eq('id', id)
+      .single()
+
+    if (existingStaff?.deleted_at) {
+      throw new Error('Cannot update deleted staff member')
+    }
+
     const { data, error } = await supabase
       .from('staff')
       .update(updates)
       .eq('id', id)
+      .is('deleted_at', null)
       .select()
       .single()
 
@@ -131,10 +145,27 @@ export async function deleteStaff(id: string) {
     }
 
     const supabase = await createServerSupabaseClient()
+
+    // 既に削除済みかチェック
+    const { data: existingStaff } = await supabase
+      .from('staff')
+      .select('deleted_at')
+      .eq('id', id)
+      .single()
+
+    if (existingStaff?.deleted_at) {
+      throw new Error('Staff member is already deleted')
+    }
+
+    // 論理削除を実行
     const { data, error } = await supabase
       .from('staff')
-      .update({ is_active: false })
+      .update({
+        is_active: false,
+        deleted_at: new Date().toISOString()
+      })
       .eq('id', id)
+      .is('deleted_at', null)
       .select()
       .single()
 

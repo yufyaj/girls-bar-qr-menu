@@ -6,18 +6,16 @@ import { Staff } from '@/app/actions/staff'
 interface StaffEditModalProps {
   isOpen: boolean
   onClose: () => void
-  onUpdate: (updates: { name?: string; staff_code?: string | null; is_active?: boolean }) => void
+  onUpdate: (updates: { name?: string; is_active?: boolean }) => void
   staff: Staff
 }
 
 export function StaffEditModal({ isOpen, onClose, onUpdate, staff }: StaffEditModalProps) {
   const [name, setName] = useState(staff.name)
-  const [staffCode, setStaffCode] = useState(staff.staff_code || '')
 
   useEffect(() => {
     if (isOpen) {
       setName(staff.name)
-      setStaffCode(staff.staff_code || '')
     }
   }, [isOpen, staff])
 
@@ -27,7 +25,6 @@ export function StaffEditModal({ isOpen, onClose, onUpdate, staff }: StaffEditMo
     e.preventDefault()
     onUpdate({
       name,
-      staff_code: staffCode || null,
     })
   }
 
@@ -64,19 +61,6 @@ export function StaffEditModal({ isOpen, onClose, onUpdate, staff }: StaffEditMo
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="staffCode" className="block text-sm font-medium text-gray-700">
-                    スタッフコード
-                  </label>
-                  <input
-                    type="text"
-                    id="staffCode"
-                    value={staffCode}
-                    onChange={(e) => setStaffCode(e.target.value)}
                     className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                 </div>

@@ -55,7 +55,6 @@ export interface Database {
           id: string
           store_id: string
           name: string
-          staff_code: string | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -64,7 +63,6 @@ export interface Database {
           id?: string
           store_id: string
           name: string
-          staff_code?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -73,7 +71,6 @@ export interface Database {
           id?: string
           store_id?: string
           name?: string
-          staff_code?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string

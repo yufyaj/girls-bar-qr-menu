@@ -307,6 +307,21 @@ export async function login(prevState: LoginState, formData: FormData): Promise<
       };
     }
 
+    // ユーザーが指定した店舗に所属しているか確認
+    const { data: storeUser, error: storeUserError } = await supabase
+      .from("store_users")
+      .select("store_id")
+      .eq("user_id", session.user.id)
+      .eq("store_id", store.id)
+      .single();
+
+    if (storeUserError || !storeUser) {
+      await supabase.auth.signOut();
+      return {
+        error: "このユーザーは指定された店舗にアクセスする権限がありません"
+      };
+    }
+
     // アクセストークンをhttpOnlyで保存
     cookiesList.set({
       ...COOKIE_BASE_OPTIONS,
