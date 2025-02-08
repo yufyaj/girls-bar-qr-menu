@@ -97,14 +97,6 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
     const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
     const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
 
-    console.log('Business Hours:', {
-      openingTime: store.opening_time,
-      closingTime: store.closing_time,
-      now: now.toISOString(),
-      businessStart: businessStart.toISOString(),
-      businessEnd: businessEnd.toISOString()
-    })
-
     const { data: rawOrders, error } = await supabase
       .from('orders')
       .select(`
@@ -173,15 +165,6 @@ export async function getSalesData(storeId: string, startDate: string, endDate: 
 
     const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
     const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
-
-    console.log('Sales Data Range:', {
-      openingTime: store.opening_time,
-      closingTime: store.closing_time,
-      startDate,
-      endDate,
-      businessStart: businessStart.toISOString(),
-      businessEnd: businessEnd.toISOString()
-    })
 
     const { data: rawOrders, error } = await supabase
       .from('orders')
