@@ -1,85 +1,46 @@
 /**
- * 日時処理に関するユーティリティ関数
- */
-
-const JST_OFFSET = 9 * 60 * 60 * 1000 // UTC+9
-
-/**
  * 日本時間でのYYYY-MM-DD形式の文字列を取得
  */
 export function getJstDateString(date: Date): string {
-  const jstDate = new Date(date.getTime() + JST_OFFSET)
+  const jstDate = new Date(date.getTime() + (date.getTimezoneOffset() + 540) * 60000)
   return jstDate.toISOString().split('T')[0]
 }
 
-/**
- * 指定した時刻が営業時間内かどうかを判定
- */
-export function isWithinBusinessHours(
-  datetime: Date,
-  openingTime: string | null,
-  closingTime: string | null
-): boolean {
-  if (!openingTime || !closingTime) return true
-
-  const jstDate = new Date(datetime.getTime() + JST_OFFSET)
-  const hour = jstDate.getHours()
-  const minute = jstDate.getMinutes()
-  const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-
-  // 深夜営業（閉店時間が開店時間より前の場合）
-  if (closingTime < openingTime) {
-    return timeString >= openingTime || timeString <= closingTime
-  }
-  // 通常営業
-  return timeString >= openingTime && timeString <= closingTime
+function parseTime(timeStr: string): { hours: number; minutes: number } {
+  const [hours, minutes] = timeStr.split(':').map(Number)
+  return { hours, minutes }
 }
 
 /**
- * 当日の営業開始時刻のDateオブジェクトを取得
+ * 営業開始日時を取得
  */
-/**
- * 営業時間を考慮して適切な営業日の日付を取得
- */
+export function getBusinessDayStart(date: Date, openingTime: string, closingTime: string): Date {
+  const startDate = new Date(date)
+  const { hours, minutes } = parseTime(openingTime)
+
+  if (openingTime <= closingTime) {
+    return new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), hours, minutes)
+  }
+
+  if (openingTime < date.toISOString().split('T')[1].slice(0, 5)) {
+    startDate.setDate(startDate.getDate() - 1)
+    return new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), hours, minutes)
+  }
+
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes)
+}
+
 /**
  * 営業終了日時を取得
  */
-export function getBusinessDayEnd(date: Date, openingTime: string | null, closingTime: string | null): Date {
-  if (!openingTime || !closingTime) return date
+export function getBusinessDayEnd(date: Date, openingTime: string, closingTime: string): Date {
+  const endDate = new Date(date)
+  const { hours, minutes } = parseTime(closingTime)
 
-  const businessEnd = new Date(date)
-  const [closingHour, closingMinute] = closingTime.split(':').map(Number)
-
-  // 深夜営業の場合（閉店時間が開店時間より前の場合）は翌日の閉店時間とする
-  if (closingTime < openingTime) {
-    businessEnd.setDate(businessEnd.getDate() + 1)
+  // 閉店時刻が翌日の場合は日付を1日進める
+  if (openingTime > closingTime) {
+    endDate.setDate(endDate.getDate() + 1)
   }
-  
-  businessEnd.setHours(closingHour, closingMinute, 59, 999)
-  return businessEnd
-}
 
-export function getAdjustedBusinessDate(date: Date, openingTime: string | null, closingTime: string | null): Date {
-  if (!openingTime || !closingTime) return date
-
-  const adjustedDate = new Date(date)
-  const currentHour = date.getHours()
-  const openingHour = parseInt(openingTime.split(':')[0])
-  
-  // 深夜営業（閉店時間が開店時間より前）かつ現在時刻が開店時間前の場合は前日とする
-  if (closingTime < openingTime && currentHour < openingHour) {
-    adjustedDate.setDate(adjustedDate.getDate() - 1)
-  }
-  
-  return adjustedDate
-}
-
-export function getBusinessDayStart(date: Date, openingTime: string | null): Date {
-  const jstDate = new Date(date.getTime() + JST_OFFSET)
-  const [openingHour, openingMinute] = (openingTime || '00:00').split(':').map(Number)
-  
-  const businessStart = new Date(jstDate)
-  businessStart.setHours(openingHour, openingMinute, 0, 0)
-  
-  return businessStart
+  return new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), hours, minutes)
 }

@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { DashboardSummary, OrderSummary } from '@/types/dashboard'
-import { getAdjustedBusinessDate, getBusinessDayEnd, getBusinessDayStart, getJstDateString, isWithinBusinessHours } from '@/utils/dateTime'
+import { getBusinessDayEnd, getBusinessDayStart } from '@/utils/dateTime'
 
 // DashboardSummaryの型をエクスポート
 export type { DashboardSummary, OrderSummary }
@@ -93,8 +93,17 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
 
     if (!store) throw new Error('Store not found')
 
-    const adjustedDate = getAdjustedBusinessDate(now, store.opening_time, store.closing_time)
-    const businessStart = getBusinessDayStart(adjustedDate, store.opening_time)
+    // 営業時間に基づいて営業日を調整
+    const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
+    const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
+
+    console.log('Business Hours:', {
+      openingTime: store.opening_time,
+      closingTime: store.closing_time,
+      now: now.toISOString(),
+      businessStart: businessStart.toISOString(),
+      businessEnd: businessEnd.toISOString()
+    })
 
     const { data: rawOrders, error } = await supabase
       .from('orders')
@@ -117,16 +126,12 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
       .eq('store_id', storeId)
       .eq('status', 'completed')
       .gte('created_at', businessStart.toISOString())
+      .lte('created_at', businessEnd.toISOString())
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
     const orders = transformOrders(rawOrders ?? [])
-      .filter(order => isWithinBusinessHours(
-        new Date(order.created_at),
-        store.opening_time,
-        store.closing_time
-      ))
 
     const totalSales = orders.reduce((sum, order) => sum + order.total_amount, 0)
     const drinkCount = orders.reduce((sum, order) => 
@@ -157,6 +162,7 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
  */
 export async function getSalesData(storeId: string, startDate: string, endDate: string) {
   try {
+    const now = new Date()
     const supabase = await createServerSupabaseClient()
     const { data: store } = await supabase
       .from('stores')
@@ -166,17 +172,17 @@ export async function getSalesData(storeId: string, startDate: string, endDate: 
 
     if (!store) throw new Error('Store not found')
 
-    // 開始日と終了日を営業時間に基づいて調整
-    const queryStartDate = getAdjustedBusinessDate(
-      new Date(startDate),
-      store.opening_time,
-      store.closing_time
-    )
-    const queryEndDate = getBusinessDayEnd(
-      new Date(endDate),
-      store.opening_time,
-      store.closing_time
-    )
+    const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
+    const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
+
+    console.log('Sales Data Range:', {
+      openingTime: store.opening_time,
+      closingTime: store.closing_time,
+      startDate,
+      endDate,
+      businessStart: businessStart.toISOString(),
+      businessEnd: businessEnd.toISOString()
+    })
 
     const { data: rawOrders, error } = await supabase
       .from('orders')
@@ -189,21 +195,13 @@ export async function getSalesData(storeId: string, startDate: string, endDate: 
       `)
       .eq('store_id', storeId)
       .eq('status', 'completed')
-      .gte('created_at', getBusinessDayStart(queryStartDate, store.opening_time).toISOString())
-      .lte('created_at', queryEndDate.toISOString())
+      .gte('created_at', businessStart.toISOString())
+      .lte('created_at', businessEnd.toISOString())
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    const orders = (rawOrders ?? []).filter(order => 
-      isWithinBusinessHours(
-        new Date(order.created_at),
-        store.opening_time,
-        store.closing_time
-      )
-    )
-
-    return { success: true, orders }
+    return { success: true, orders: rawOrders ?? [] }
   } catch (error) {
     console.error('Failed to fetch sales data:', error)
     return { success: false, error: 'Failed to fetch sales data' }
