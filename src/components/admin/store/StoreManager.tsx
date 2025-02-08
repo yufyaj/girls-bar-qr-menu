@@ -21,6 +21,8 @@ export function StoreManager({ initialStore }: StoreManagerProps) {
       phone: editData.phone,
       service_charge: editData.service_charge,
       table_charge: editData.table_charge,
+      opening_time: editData.opening_time,
+      closing_time: editData.closing_time,
     })
 
     if (result.success && result.data) {
@@ -104,6 +106,26 @@ export function StoreManager({ initialStore }: StoreManagerProps) {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700">営業開始時間</label>
+            <input
+              type="time"
+              value={editData.opening_time || ''}
+              onChange={(e) => setEditData({ ...editData, opening_time: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">営業終了時間</label>
+            <input
+              type="time"
+              value={editData.closing_time || ''}
+              onChange={(e) => setEditData({ ...editData, closing_time: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+
           <div className="flex gap-2">
             <button
               onClick={handleUpdate}
@@ -168,6 +190,16 @@ export function StoreManager({ initialStore }: StoreManagerProps) {
             <dd className="mt-1 text-sm text-gray-900">
               {store.table_charge ? `¥${store.table_charge.toLocaleString()}` : '未設定'}
             </dd>
+          </div>
+
+          <div>
+            <dt className="text-sm font-medium text-gray-500">営業開始時間</dt>
+            <dd className="mt-1 text-sm text-gray-900">{store.opening_time || '未設定'}</dd>
+          </div>
+
+          <div>
+            <dt className="text-sm font-medium text-gray-500">営業終了時間</dt>
+            <dd className="mt-1 text-sm text-gray-900">{store.closing_time || '未設定'}</dd>
           </div>
         </dl>
       </div>

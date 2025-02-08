@@ -47,3 +47,9 @@ CREATE POLICY "Authenticated users can view" ON store_users
 FOR SELECT
 TO authenticated
 USING (true);
+
+
+-- Add business hours columns to stores table
+ALTER TABLE stores
+ADD COLUMN opening_time TIME,
+ADD COLUMN closing_time TIME;

@@ -18,6 +18,8 @@ export interface Database {
           phone: string | null
           service_charge: number | null
           table_charge: number | null
+          opening_time: string | null
+          closing_time: string | null
           created_at: string
           updated_at: string
         }
@@ -29,6 +31,8 @@ export interface Database {
           phone?: string | null
           service_charge?: number | null
           table_charge?: number | null
+          opening_time?: string | null
+          closing_time?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -40,6 +44,8 @@ export interface Database {
           phone?: string | null
           service_charge?: number | null
           table_charge?: number | null
+          opening_time?: string | null
+          closing_time?: string | null
           created_at?: string
           updated_at?: string
         }

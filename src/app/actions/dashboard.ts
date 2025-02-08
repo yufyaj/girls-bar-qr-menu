@@ -1,44 +1,101 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { Database } from '@/types/database'
+import { DashboardSummary, OrderSummary } from '@/types/dashboard'
+import { getAdjustedBusinessDate, getBusinessDayEnd, getBusinessDayStart, getJstDateString, isWithinBusinessHours } from '@/utils/dateTime'
 
-export interface DashboardSummary {
-  totalSales: number
-  orderCount: number
-  drinkCount: number
-  customerCount: number
-  recentOrders: any[]
+// DashboardSummaryの型をエクスポート
+export type { DashboardSummary, OrderSummary }
+
+function estimateCustomerCount(orders: OrderSummary[]): number {
+  if (orders.length === 0) return 0
+
+  const tableUsages: { [tableId: string]: Date[] } = {}
+  orders.forEach(order => {
+    if (!tableUsages[order.table_id]) tableUsages[order.table_id] = []
+    tableUsages[order.table_id].push(new Date(order.created_at))
+  })
+
+  return Object.values(tableUsages).reduce((total, usageTimes) => {
+    usageTimes.sort((a, b) => a.getTime() - b.getTime())
+    let sessions = 1
+    for (let i = 1; i < usageTimes.length; i++) {
+      if (usageTimes[i].getTime() - usageTimes[i-1].getTime() > 2 * 60 * 60 * 1000) {
+        sessions++
+      }
+    }
+    return total + sessions
+  }, 0)
 }
 
-type DatabaseOrder = {
+function isSafeOrder(order: unknown): order is {
   id: string
   created_at: string
-  total_amount: number
+  total_amount: number | null
   status: string
   table_id: string
-  tables: {
-    table_number: string
-  }
-  order_items: {
+  tables: { table_number: string } | null
+  order_items: Array<{
     id: string
-    quantity: number
+    quantity: number | null
     menu_items: {
       id: string
-      category_id: number
+      category_id: string
     }
-  }[]
+  }> | null
+} {
+  const o = order as any
+  return (
+    typeof o?.id === 'string' &&
+    typeof o?.created_at === 'string' &&
+    typeof o?.status === 'string' &&
+    typeof o?.table_id === 'string' &&
+    (o?.total_amount === null || typeof o?.total_amount === 'number') &&
+    (o?.tables === null || (typeof o?.tables?.table_number === 'string')) &&
+    (o?.order_items === null || Array.isArray(o?.order_items))
+  )
 }
 
+function transformOrders(rawOrders: unknown[]): OrderSummary[] {
+  return rawOrders
+    .filter(isSafeOrder)
+    .map(order => ({
+      id: order.id,
+      created_at: order.created_at,
+      total_amount: order.total_amount ?? 0,
+      status: order.status,
+      table_id: order.table_id,
+      table_number: order.tables?.table_number ?? '',
+      items: (order.order_items ?? []).map(item => ({
+        id: item.id,
+        quantity: item.quantity ?? 0,
+        menu_item: {
+          id: item.menu_items.id,
+          category_id: item.menu_items.category_id
+        }
+      }))
+    }))
+}
+
+/**
+ * ダッシュボードの集計データを取得
+ */
 export async function getDashboardSummary(storeId: string): Promise<DashboardSummary> {
-  // JSTの今日の0時を取得
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  // UTCに変換（JST 0:00 = UTC 15:00 前日）
-  const todayUTC = new Date(today.getTime() - (today.getTimezoneOffset() * 60000))
+  const now = new Date()
 
   try {
     const supabase = await createServerSupabaseClient()
+    const { data: store } = await supabase
+      .from('stores')
+      .select('opening_time, closing_time')
+      .eq('id', storeId)
+      .single()
+
+    if (!store) throw new Error('Store not found')
+
+    const adjustedDate = getAdjustedBusinessDate(now, store.opening_time, store.closing_time)
+    const businessStart = getBusinessDayStart(adjustedDate, store.opening_time)
+
     const { data: rawOrders, error } = await supabase
       .from('orders')
       .select(`
@@ -47,9 +104,7 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
         total_amount,
         status,
         table_id,
-        tables (
-          table_number
-        ),
+        tables (table_number),
         order_items (
           id,
           quantity,
@@ -61,52 +116,30 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
       `)
       .eq('store_id', storeId)
       .eq('status', 'completed')
-      .gte('created_at', todayUTC.toISOString())
+      .gte('created_at', businessStart.toISOString())
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
-    // データを安全に変換
-    const orders = (rawOrders as unknown as DatabaseOrder[]) || []
-    console.log('Fetched orders:', JSON.stringify(orders, null, 2))
+    const orders = transformOrders(rawOrders ?? [])
+      .filter(order => isWithinBusinessHours(
+        new Date(order.created_at),
+        store.opening_time,
+        store.closing_time
+      ))
 
-    const summary: DashboardSummary = {
-      totalSales: 0,
-      orderCount: 0,
-      drinkCount: 0,
-      customerCount: 0,
-      recentOrders: orders.slice(0, 5),
+    const totalSales = orders.reduce((sum, order) => sum + order.total_amount, 0)
+    const drinkCount = orders.reduce((sum, order) => 
+      sum + order.items.reduce((itemSum, item) => 
+        itemSum + (item.menu_item.category_id === '2' ? item.quantity : 0), 0), 0)
+
+    return {
+      totalSales,
+      orderCount: orders.length,
+      drinkCount,
+      customerCount: estimateCustomerCount(orders),
+      recentOrders: orders.slice(0, 5)
     }
-
-    if (orders.length > 0) {
-      summary.orderCount = orders.length
-      console.log('Order count:', summary.orderCount)
-
-      summary.totalSales = orders.reduce((sum: number, order) => {
-        const amount = order.total_amount || 0
-        console.log('Order amount:', amount, 'for order:', order.id)
-        return sum + amount
-      }, 0)
-      console.log('Total sales:', summary.totalSales)
-
-      summary.drinkCount = orders.reduce((sum: number, order) => {
-        const orderDrinks = order.order_items.reduce((itemSum: number, item) => {
-          const isDrink = item.menu_items.category_id === 2 // 2はドリンクカテゴリーのID
-          const quantity = isDrink ? item.quantity : 0
-          console.log('Item:', item, 'isDrink:', isDrink, 'quantity:', quantity)
-          return itemSum + quantity
-        }, 0)
-        console.log('Order drinks:', orderDrinks, 'for order:', order.id)
-        return sum + orderDrinks
-      }, 0)
-      console.log('Total drinks:', summary.drinkCount)
-
-      const uniqueTables = new Set(orders.map(order => order.table_id))
-      console.log('Unique tables:', Array.from(uniqueTables))
-      summary.customerCount = uniqueTables.size
-    }
-
-    return summary
   } catch (error) {
     console.error('Failed to fetch dashboard summary:', error)
     return {
@@ -114,32 +147,62 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
       orderCount: 0,
       drinkCount: 0,
       customerCount: 0,
-      recentOrders: [],
+      recentOrders: []
     }
   }
 }
 
+/**
+ * 売上データを期間指定で取得
+ */
 export async function getSalesData(storeId: string, startDate: string, endDate: string) {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: orders, error } = await supabase
+    const { data: store } = await supabase
+      .from('stores')
+      .select('opening_time, closing_time')
+      .eq('id', storeId)
+      .single()
+
+    if (!store) throw new Error('Store not found')
+
+    // 開始日と終了日を営業時間に基づいて調整
+    const queryStartDate = getAdjustedBusinessDate(
+      new Date(startDate),
+      store.opening_time,
+      store.closing_time
+    )
+    const queryEndDate = getBusinessDayEnd(
+      new Date(endDate),
+      store.opening_time,
+      store.closing_time
+    )
+
+    const { data: rawOrders, error } = await supabase
       .from('orders')
       .select(`
         *,
         order_items (
           *,
-          menu_items (
-            name
-          )
+          menu_items (name)
         )
       `)
       .eq('store_id', storeId)
       .eq('status', 'completed')
-      .gte('created_at', `${startDate}T00:00:00`)
-      .lte('created_at', `${endDate}T23:59:59`)
+      .gte('created_at', getBusinessDayStart(queryStartDate, store.opening_time).toISOString())
+      .lte('created_at', queryEndDate.toISOString())
       .order('created_at', { ascending: false })
 
     if (error) throw error
+
+    const orders = (rawOrders ?? []).filter(order => 
+      isWithinBusinessHours(
+        new Date(order.created_at),
+        store.opening_time,
+        store.closing_time
+      )
+    )
+
     return { success: true, orders }
   } catch (error) {
     console.error('Failed to fetch sales data:', error)

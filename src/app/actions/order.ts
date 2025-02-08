@@ -1,11 +1,9 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { Database } from '@/types/database'
 import { OrderItem } from '@/types/order'
 
 export async function getOrders(storeId: string) {
-
   try {
     const supabase = await createServerSupabaseClient()
     const { data: orders, error } = await supabase
@@ -95,7 +93,7 @@ export async function createOrder(tableId: string, items: OrderItem[]) {
         store_id: table.store_id,
         table_id: tableId,
         total_amount: totalAmount,
-        status: 'pending',
+        status: 'pending'
       })
       .select()
       .single()
@@ -130,7 +128,7 @@ export async function createOrder(tableId: string, items: OrderItem[]) {
         return {
           staff_id: item.staffId,
           order_item_id: orderItem.id,
-          drink_date: new Date().toISOString().split('T')[0]
+          drink_date: (new Date()).toISOString().split('T')[0]
         }
       })
 

@@ -80,7 +80,7 @@ export function DashboardClient({ storeId }: { storeId: string }) {
               summary.recentOrders.map(order => (
                 <div key={order.id} className="flex justify-between items-center text-sm">
                   <div>
-                    <p className="font-medium">{order.tables.table_number}</p>
+                    <p className="font-medium">{order.table_number}</p>
                     <p className="text-gray-500">
                       {new Date(order.created_at).toLocaleTimeString()}
                     </p>

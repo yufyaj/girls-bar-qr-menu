@@ -78,6 +78,8 @@ export async function updateStore(
     phone?: string | null
     service_charge?: number | null
     table_charge?: number | null
+    opening_time?: string | null
+    closing_time?: string | null
   }
 ) {
   try {
