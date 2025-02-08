@@ -153,7 +153,6 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
  */
 export async function getSalesData(storeId: string, startDate: string, endDate: string) {
   try {
-    const now = new Date()
     const supabase = await createServerSupabaseClient()
     const { data: store } = await supabase
       .from('stores')
@@ -163,8 +162,11 @@ export async function getSalesData(storeId: string, startDate: string, endDate: 
 
     if (!store) throw new Error('Store not found')
 
-    const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
-    const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
+    // 開始日の営業開始時刻を取得
+    const startDateTime = getBusinessDayStart(new Date(startDate), store.opening_time, store.closing_time)
+    
+    // 終了日の営業終了時刻を取得
+    const endDateTime = getBusinessDayEnd(new Date(endDate), store.opening_time, store.closing_time)
 
     const { data: rawOrders, error } = await supabase
       .from('orders')
@@ -176,9 +178,8 @@ export async function getSalesData(storeId: string, startDate: string, endDate: 
         )
       `)
       .eq('store_id', storeId)
-      .eq('status', 'completed')
-      .gte('created_at', businessStart.toISOString())
-      .lte('created_at', businessEnd.toISOString())
+      .gte('created_at', startDateTime.toISOString())
+      .lte('created_at', endDateTime.toISOString())
       .order('created_at', { ascending: false })
 
     if (error) throw error

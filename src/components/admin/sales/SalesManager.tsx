@@ -1,24 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CardContainer } from '@/components/ui/containers/CardContainer'
 import { Order, DatabaseOrderItem } from '@/types/order'
 import { getSalesData } from '@/app/actions/dashboard'
 
 interface SalesManagerProps {
   storeId: string
-  initialOrders: Order[]
 }
 
-export function SalesManager({ storeId, initialOrders }: SalesManagerProps) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders)
+export function SalesManager({ storeId }: SalesManagerProps) {
+  const [orders, setOrders] = useState<Order[]>([])
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().setHours(0, 0, 0, 0)).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
   })
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleDateChange = async (newDateRange: typeof dateRange) => {
+  const handleDateChange = useCallback(async (newDateRange: typeof dateRange) => {
     setIsLoading(true)
     setDateRange(newDateRange)
     
@@ -32,7 +31,11 @@ export function SalesManager({ storeId, initialOrders }: SalesManagerProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [storeId])
+
+  useEffect(() => {
+    handleDateChange(dateRange)
+  }, [handleDateChange])
 
   const calculateTotalSales = () => {
     return orders.reduce((total, order) => {

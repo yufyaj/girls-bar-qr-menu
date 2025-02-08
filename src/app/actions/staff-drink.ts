@@ -6,12 +6,43 @@ import { cookies } from 'next/headers'
 import { Database } from '@/types/database'
 import { revalidatePath } from 'next/cache'
 import { createPublicSupabaseClient } from '@/lib/supabase/server'
+import { getStore } from './store'
+import { getBusinessDayStart, getBusinessDayEnd } from '@/utils/dateTime'
 
 export type StaffDrink = Database['public']['Tables']['staff_drinks']['Row']
 
 // 店員ドリンク一覧を取得
 export const getStaffDrinks = async (staffId: string, startDate: string, endDate: string) => {
   const supabase = await createPublicSupabaseClient() as SupabaseClient<Database>
+
+  // スタッフの店舗情報を取得
+  const { data: staff } = await supabase
+    .from('staff')
+    .select('store_id')
+    .eq('id', staffId)
+    .single()
+
+  if (!staff) {
+    throw new Error('スタッフ情報の取得に失敗しました')
+  }
+
+  // 店舗の営業時間を取得
+  const { data: store } = await getStore(staff.store_id)
+  if (!store || !store.opening_time || !store.closing_time) {
+    throw new Error('店舗の営業時間が設定されていません')
+  }
+
+  // 営業時間に基づいて日付範囲を調整
+  const startDateTime = getBusinessDayStart(
+    new Date(startDate),
+    store.opening_time,
+    store.closing_time
+  )
+  const endDateTime = getBusinessDayEnd(
+    new Date(endDate),
+    store.opening_time,
+    store.closing_time
+  )
 
   const { data: staffDrinks, error } = await supabase
     .from('staff_drinks')
@@ -25,8 +56,8 @@ export const getStaffDrinks = async (staffId: string, startDate: string, endDate
       )
     `)
     .eq('staff_id', staffId)
-    .gte('drink_date', startDate)
-    .lte('drink_date', endDate)
+    .gte('drink_date', startDateTime.toISOString())
+    .lte('drink_date', endDateTime.toISOString())
     .order('drink_date', { ascending: false })
 
   if (error) {
