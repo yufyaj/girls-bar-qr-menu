@@ -124,7 +124,6 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
         )
       `)
       .eq('store_id', storeId)
-      .eq('status', 'completed')
       .gte('created_at', businessStart.toISOString())
       .lte('created_at', businessEnd.toISOString())
       .order('created_at', { ascending: false })
