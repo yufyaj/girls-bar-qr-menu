@@ -1,13 +1,12 @@
 'use client'
 
 import { Order } from '@/types/order-manager'
-import { getStatusColor, getStatusLabel, getNextStatus } from '@/utils/orderStatus'
+import { getStatusColor, getStatusLabel, getNextStatus, OrderStatusType } from '@/utils/orderStatus'
 import { CardContainer } from '@/components/ui/containers/CardContainer'
-import { OrderStatus } from '@/types/order'
 
 interface OrderListProps {
   orders: Order[]
-  onStatusUpdate: (orderId: string, newStatus: OrderStatus) => void
+  onStatusUpdate: (orderId: string, newStatus: OrderStatusType) => void
 }
 
 export function OrderList({ orders, onStatusUpdate }: OrderListProps) {
