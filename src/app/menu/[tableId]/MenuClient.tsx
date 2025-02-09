@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { CardContainer } from '@/components/ui/containers/CardContainer'
 import { StaffSelectionModal } from '@/components/ui/modals/StaffSelectionModal'
 import { OrderConfirmationModal } from '@/components/ui/modals/OrderConfirmationModal'
@@ -33,6 +34,7 @@ interface MenuClientProps {
 }
 
 export function MenuClient({ tableId, storeId }: MenuClientProps) {
+  const router = useRouter()
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -341,11 +343,8 @@ export function MenuClient({ tableId, storeId }: MenuClientProps) {
             if (result.success) {
               setIsCheckoutModalOpen(false)
               setCheckoutTotal(undefined)
-              showToast({
-                type: 'success',
-                title: 'お会計が完了しました',
-                message: 'スタッフが伺いますので、そのままお待ちください',
-              })
+              // お会計完了画面に遷移
+              router.push(`/menu/${tableId}/checkout-complete`)
             } else {
               showToast({
                 type: 'error',
