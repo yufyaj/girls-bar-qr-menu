@@ -1,7 +1,28 @@
 'use server'
 
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { OrderItem } from '@/types/order'
+import { OrderItem, OrderDetail } from '@/types/order'
+import { Database } from '@/types/database'
+
+type OrderWithItems = {
+  total_amount: number;
+  order_items: Array<{
+    quantity: number;
+    price_at_time: number;
+    is_staff_drink: boolean;
+    menu_items: {
+      name: string;
+    };
+    staff: {
+      name: string;
+    } | null;
+  }>;
+}
+
+type PostgrestResponse = {
+  data: OrderWithItems[] | null;
+  error: Error | null;
+}
 
 export async function getOrders(storeId: string) {
   try {
@@ -48,6 +69,84 @@ export async function updateOrderStatus(orderId: string, status: string) {
   } catch (error) {
     console.error('Failed to update order status:', error)
     return { success: false, error: 'Failed to update order status' }
+  }
+}
+
+export async function getUncompletedOrdersTotal(tableId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    // 未完了の注文を取得（明細情報含む）
+    const result = await supabase
+      .from('orders')
+      .select(`
+        total_amount,
+        order_items!inner (
+          quantity,
+          price_at_time,
+          is_staff_drink,
+          menu_items:menu_item_id!inner (
+            name
+          ),
+          staff:staff_id (
+            name
+          )
+        )
+      `)
+      .eq('table_id', tableId)
+      .neq('status', 'completed')
+
+    if (result.error) throw result.error
+
+    const orders = (result.data || []) as unknown as OrderWithItems[]
+
+    if (orders.length === 0) {
+      return { success: true, totalAmount: 0, orderDetails: [] }
+    }
+    
+    // 注文明細を作成
+    const orderDetails: OrderDetail[] = orders.flatMap(order =>
+      order.order_items.map(item => ({
+        name: item.menu_items.name,
+        quantity: item.quantity,
+        price: item.price_at_time,
+        isStaffDrink: item.is_staff_drink,
+        staffName: item.staff?.name ?? undefined,
+        subtotal: item.quantity * item.price_at_time
+      }))
+    )
+    
+    // 合計金額を計算
+    const totalAmount = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
+    
+    return {
+      success: true,
+      totalAmount,
+      orderDetails
+    }
+  } catch (error) {
+    console.error('Failed to get uncompleted orders total:', error)
+    return { success: false, error: '合計金額の取得に失敗しました' }
+  }
+}
+
+export async function completeOrders(tableId: string) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    
+    // ステータスを完了に更新
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'completed' })
+      .eq('table_id', tableId)
+      .neq('status', 'completed')
+
+    if (error) throw error
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to checkout table:', error)
+    return { success: false, error: 'お会計の処理に失敗しました' }
   }
 }
 

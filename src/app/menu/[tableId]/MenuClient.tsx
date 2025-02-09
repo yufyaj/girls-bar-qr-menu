@@ -5,10 +5,11 @@ import Image from 'next/image'
 import { CardContainer } from '@/components/ui/containers/CardContainer'
 import { StaffSelectionModal } from '@/components/ui/modals/StaffSelectionModal'
 import { OrderConfirmationModal } from '@/components/ui/modals/OrderConfirmationModal'
+import { CheckoutConfirmationModal } from '@/components/ui/modals/CheckoutConfirmationModal'
 import { useToast } from '@/components/ui/notifications/Toast'
 import { getMenuData, getActiveStaff } from '@/app/actions/menu'
-import { createOrder } from '@/app/actions/order'
-import { OrderItem } from '@/types/order'
+import { createOrder, getUncompletedOrdersTotal, completeOrders } from '@/app/actions/order'
+import { OrderItem, OrderDetail } from '@/types/order'
 import { MenuCategory } from '@/app/actions/menu'
 import { Database } from '@/types/database'
 
@@ -35,6 +36,9 @@ export function MenuClient({ tableId, storeId }: MenuClientProps) {
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
+  const [checkoutTotal, setCheckoutTotal] = useState<number | undefined>(undefined)
+  const [orderDetails, setOrderDetails] = useState<OrderDetail[] | undefined>(undefined)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [categories, setCategories] = useState<MenuCategory[]>([])
@@ -322,6 +326,80 @@ export function MenuClient({ tableId, storeId }: MenuClientProps) {
         onConfirm={handleConfirmOrder}
         items={cartItems}
       />
+
+      <CheckoutConfirmationModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => {
+          setIsCheckoutModalOpen(false)
+          setCheckoutTotal(undefined)
+          setOrderDetails(undefined)
+        }}
+        onConfirm={async () => {
+          setIsSubmitting(true)
+          try {
+            const result = await completeOrders(tableId)
+            if (result.success) {
+              setIsCheckoutModalOpen(false)
+              setCheckoutTotal(undefined)
+              showToast({
+                type: 'success',
+                title: 'お会計が完了しました',
+                message: 'スタッフが伺いますので、そのままお待ちください',
+              })
+            } else {
+              showToast({
+                type: 'error',
+                title: 'お会計に失敗しました',
+                message: '申し訳ありませんが、もう一度お試しください',
+              })
+            }
+          } catch (error) {
+            showToast({
+              type: 'error',
+              title: 'お会計に失敗しました',
+              message: '申し訳ありませんが、もう一度お試しください',
+            })
+          } finally {
+            setIsSubmitting(false)
+          }
+        }}
+        isSubmitting={isSubmitting}
+        totalAmount={checkoutTotal}
+        orderDetails={orderDetails}
+      />
+
+      {/* お会計ボタン */}
+      <div className="fixed bottom-20 left-0 right-0 mx-auto w-full max-w-md px-4">
+        <button
+          type="button"
+          onClick={async () => {
+            // 合計金額を取得
+            try {
+              const result = await getUncompletedOrdersTotal(tableId)
+              if (result.success && result.totalAmount !== undefined && result.orderDetails) {
+                setCheckoutTotal(result.totalAmount)
+                setOrderDetails(result.orderDetails)
+                setIsCheckoutModalOpen(true)
+              } else {
+                showToast({
+                  type: 'error',
+                  title: 'お会計情報の取得に失敗しました',
+                  message: '申し訳ありませんが、もう一度お試しください',
+                })
+              }
+            } catch (error) {
+              showToast({
+                type: 'error',
+                title: 'お会計情報の取得に失敗しました',
+                message: '申し訳ありませんが、もう一度お試しください',
+              })
+            }
+          }}
+          className="w-full rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+        >
+          お会計をする
+        </button>
+      </div>
 
       {Toast}
     </>
