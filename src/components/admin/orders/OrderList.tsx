@@ -1,7 +1,7 @@
 'use client'
 
 import { Order } from '@/types/order-manager'
-import { getStatusColor, getStatusLabel, getNextStatus, OrderStatusType } from '@/utils/orderStatus'
+import { getStatusColor, getStatusLabel, getNextStatus, OrderStatusType, OrderStatus } from '@/utils/orderStatus'
 import { CardContainer } from '@/components/ui/containers/CardContainer'
 
 interface OrderListProps {
@@ -59,18 +59,28 @@ export function OrderList({ orders, onStatusUpdate }: OrderListProps) {
               </div>
               <p className="text-gray-500 mt-2">{`合計金額: ¥${order.total_amount}`}</p>
             </div>
-            <div>
-              <button
-                onClick={() => {
-                  const nextStatus = getNextStatus(order.status)
-                  if (nextStatus) {
-                    onStatusUpdate(order.id, nextStatus)
-                  }
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                ステータス更新
-              </button>
+            <div className="space-x-2">
+              {order.status !== 'cancelled' && (
+                <>
+                  <button
+                    onClick={() => {
+                      const nextStatus = getNextStatus(order.status)
+                      if (nextStatus) {
+                        onStatusUpdate(order.id, nextStatus)
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    ステータス更新
+                  </button>
+                  <button
+                    onClick={() => onStatusUpdate(order.id, OrderStatus.CANCELED)}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    キャンセル
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </CardContainer>

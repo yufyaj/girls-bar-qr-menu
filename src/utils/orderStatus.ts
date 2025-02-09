@@ -5,7 +5,7 @@ export const OrderStatus = {
   PENDING: 'pending',    // 注文受付待ち
   ACCEPTED: 'accepted',  // 注文受付済み
   COMPLETED: 'completed', // 提供完了
-  CANCELED: 'canceled',  // キャンセル
+  CANCELED: 'cancelled',  // キャンセル
 } as const;
 
 export type OrderStatusType = typeof OrderStatus[keyof typeof OrderStatus];

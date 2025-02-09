@@ -94,7 +94,7 @@ export async function getUncompletedOrdersTotal(tableId: string) {
         )
       `)
       .eq('table_id', tableId)
-      .neq('status', 'completed')
+      .not('status', 'in', '("completed","cancelled")')
 
     if (result.error) throw result.error
 
@@ -139,7 +139,7 @@ export async function completeOrders(tableId: string) {
       .from('orders')
       .update({ status: 'completed' })
       .eq('table_id', tableId)
-      .neq('status', 'completed')
+      .not('status', 'in', '("completed","cancelled")')
 
     if (error) throw error
     
