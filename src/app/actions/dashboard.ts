@@ -97,6 +97,8 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
     const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
     const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
 
+    console.log('Business day:', businessStart, businessEnd)
+
     const { data: rawOrders, error } = await supabase
       .from('orders')
       .select(`

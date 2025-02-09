@@ -22,7 +22,7 @@ export function getBusinessDayStart(date: Date, openingTime: string, closingTime
     return new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), hours, minutes)
   }
 
-  if (openingTime < date.toISOString().split('T')[1].slice(0, 5)) {
+  if (openingTime > date.toISOString().split('T')[1].slice(0, 5)) {
     startDate.setDate(startDate.getDate() - 1)
     return new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), hours, minutes)
   }
@@ -39,7 +39,9 @@ export function getBusinessDayEnd(date: Date, openingTime: string, closingTime: 
 
   // 閉店時刻が翌日の場合は日付を1日進める
   if (openingTime > closingTime) {
-    endDate.setDate(endDate.getDate() + 1)
+    if (openingTime <= date.toISOString().split('T')[1].slice(0, 5)) {
+      endDate.setDate(endDate.getDate() + 1)
+    }
   }
 
   return new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), hours, minutes)
