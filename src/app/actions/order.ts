@@ -45,7 +45,7 @@ export async function getOrders(storeId: string) {
         )
       `)
       .eq('store_id', storeId)
-      .neq('status', 'completed')
+      .in('status', ['pending', 'preparing'])
       .order('created_at', { ascending: false })
 
     if (error) throw error
