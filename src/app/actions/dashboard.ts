@@ -93,7 +93,7 @@ export async function getDashboardSummary(storeId: string): Promise<DashboardSum
 
     if (!store) throw new Error('Store not found')
 
-    // 営業時間に基づいて営業日を調整
+    // 営業時間に基づいて営業日を調整　
     const businessStart = getBusinessDayStart(now, store.opening_time, store.closing_time)
     const businessEnd = getBusinessDayEnd(now, store.opening_time, store.closing_time)
 
